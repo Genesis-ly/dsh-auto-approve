@@ -1,0 +1,46 @@
+# dsh-auto-approve bundle patch: inserts the dsh-auto-approve plugin row.
+# Applied as a profile bundle layer through `dsh.bundle.patch`.
+#
+# The plugin listens on the Host approval waterfall and answers a shell
+# escalation itself ONLY when every write target of the command resolves inside
+# `allowRoots`. Any doubt — unknown tool, unknown arguments, unparsable command,
+# unresolvable path, protected file — delegates to the normal approval UI.
+- insert:
+    - id: dsh-auto-approve
+      name: dsh-auto-approve
+      config:
+        # Master switch. false leaves the approval chain exactly as it was.
+        enabled: true
+        # Answer strategy:
+        #   strict   — only provably-inside-allowRoots writes (measured 3/81)
+        #   window   — after a human grant, N minutes of unblocked escalations
+        #   denylist — any escalation with no denied construct (measured 60/81)
+        #   both     — strict proof OR the window rule
+        mode: denylist
+        # Only used by `window`: how long a human grant keeps answering, sliding.
+        grantMinutes: 10
+        # true = evaluate and audit only, never grant.
+        dryRun: false
+        # Absolute directory roots a write may touch without asking. Values may
+        # use `~`, may be relative to the home directory, and may contain `*`
+        # segments, which are expanded against the directories that exist now.
+        allowRoots:
+          - '~/.dsh/plugins'
+          - '~/.dsh/profiles/*/node_modules'
+          - '~/.dsh/dsh-auto-approve'
+        # Write targets that always need a human, even inside allowRoots.
+        protectedPaths:
+          - '~/.dsh/profiles/*/package.json'
+          - '~/.dsh/profiles/*/cordis.yml'
+          - '~/.dsh/profiles/*/cordis.patch.yml'
+        # Tool names this plugin is allowed to answer for.
+        tools:
+          - ops_bash
+          - bash
+          - pwsh
+          - pwsh_bash
+        # Commands longer than this are never auto-approved.
+        maxCommandLength: 6000
+        # Audit trail: one JSON line per approval request this plugin saw.
+        auditPath: '~/.dsh/dsh-auto-approve/audit.jsonl'
+        maxAuditCommand: 300
